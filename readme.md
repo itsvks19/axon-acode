@@ -97,10 +97,6 @@ Axon automatically includes your current file's code when you ask questions abou
 - Keys are never logged or transmitted except to the chosen AI provider
 - All communication with AI providers uses HTTPS
 
-## License
-
-This project is licensed under the MIT License.
-
 ## Author
 
 **Vivek** ([@itsvks19](https://github.com/itsvks19))
