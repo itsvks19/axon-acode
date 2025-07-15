@@ -168,8 +168,6 @@ if (window.acode) {
             autoClose: true,
           });
         } else if (key === "api-key") {
-          localStorage.setItem("axon-api-key", value as string);
-
           axon.settings.apiKey = value as string;
           await axon.saveSettings();
           acode.pushNotification("Saved", "API key saved successfully", {
