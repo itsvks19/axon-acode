@@ -1,0 +1,21 @@
+{
+  "author": {
+    "email": "itsvks19@proton.me",
+    "github": "itsvks19",
+    "name": "Vivek",
+    "url": ""
+  },
+  "changelogs": "changelogs.md",
+  "description": "Smart coding agent for Acode.",
+  "files": ["banner.png"],
+  "icon": "icon.png",
+  "id": "com.itsvks.axon",
+  "keywords": ["ai", "agent"],
+  "main": "axon.js",
+  "minVersionCode": 292,
+  "name": "Axon",
+  "price": 19,
+  "readme": "readme.md",
+  "repository": "",
+  "version": "1.0.0"
+}
