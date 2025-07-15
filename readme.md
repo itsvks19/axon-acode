@@ -1,7 +1,7 @@
 # Axon - AI Coding Assistant for Acode
 
 <div align="center">
-  <img src="banner.png" alt="Axon Logo" height="190"/>
+  <img src="banner.png" alt="Axon Banner" height="190"/>
   
   **Smart AI pair programmer that integrates seamlessly into Acode editor**
 </div>

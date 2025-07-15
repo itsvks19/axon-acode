@@ -6,6 +6,7 @@
   "main": "dist/main.js",
   "scripts": {
     "acode": "npm run build:css && node esbuild.config.mjs --serve",
+    "build:acode": "npm run build:css && tsc --noEmit && node esbuild.config.mjs",
     "dev": "vite",
     "build": "vite build",
     "build:css": "tailwindcss -i ./src/index.css -o ./src/axon.css --minify",

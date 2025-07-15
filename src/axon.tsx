@@ -86,7 +86,7 @@ class Axon {
     if (this.settings.apiKey) {
       const encrypted = this.encrypt(this.settings.apiKey);
       const toSave = { ...this.settings, apiKey: encrypted };
-      if (!file.exists) {
+      if (!(await file.exists())) {
         await filesystem.createFile(
           "axon_settings.json",
           JSON.stringify(toSave),
@@ -96,7 +96,7 @@ class Axon {
       }
       console.log("Axon Settings saved (API key encrypted).");
     } else {
-      if (!file.exists) {
+      if (!(await file.exists())) {
         await filesystem.createFile(
           "axon_settings.json",
           JSON.stringify(this.settings),
@@ -165,6 +165,7 @@ if (window.acode) {
           await axon.saveSettings();
           acode.pushNotification("Saved", "Language model saved successfully", {
             type: "success",
+            icon: "check",
             autoClose: true,
           });
         } else if (key === "api-key") {
@@ -174,6 +175,7 @@ if (window.acode) {
           await axon.saveSettings();
           acode.pushNotification("Saved", "API key saved successfully", {
             type: "success",
+            icon: "check",
             autoClose: true,
           });
         } else {

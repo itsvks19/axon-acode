@@ -132,7 +132,7 @@ export function AIAssistant({ settings }: AxonProps) {
       });
 
       const userWantsCodeContext =
-        /\b(code|file|function|bug|refactor|fix|optimize|explain|editor)\b/i.test(
+        /\b(code|file|function|bug|refactor|fix|optimize|explain|write|editor)\b/i.test(
           content,
         );
 
