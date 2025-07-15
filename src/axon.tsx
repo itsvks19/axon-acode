@@ -118,7 +118,6 @@ class Axon {
         loaded.apiKey = this.decrypt(loaded.apiKey);
       }
       this.settings = loaded;
-      console.log("Settings loaded (API key decrypted):", this.settings);
     } catch (err) {
       console.warn("No settings file found, using defaults:", err);
       this.settings = { llm: "gemini" };

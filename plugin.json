@@ -12,10 +12,10 @@
   "id": "com.itsvks.axon",
   "keywords": ["ai", "agent", "chatbot", "assistant", "copilot", "llm", "axon"],
   "main": "axon.js",
-  "minVersionCode": 292,
-  "name": "Axon",
-  "price": 9,
+  "minVersionCode": 954,
+  "name": "Axon AI",
+  "price": 15,
   "readme": "readme.md",
   "repository": "",
-  "version": "1.0.0"
+  "version": "1.0.1"
 }
