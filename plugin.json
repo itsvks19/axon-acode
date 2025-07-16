@@ -16,6 +16,6 @@
   "name": "Axon AI",
   "price": 15,
   "readme": "readme.md",
-  "repository": "",
-  "version": "1.0.2"
+  "repository": "https://github.com/itsvks19/axon-acode",
+  "version": "1.0.3"
 }
