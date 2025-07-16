@@ -7,9 +7,6 @@ import { createRoot } from "react-dom/client";
 import * as React from "react";
 import CryptoJS from "crypto-js";
 
-const prompt = acode.require("prompt");
-const select = acode.require("select");
-const settings = acode.require("settings");
 const fs = acode.require("fs");
 
 export type AxonSettings = {
@@ -29,7 +26,7 @@ class Axon {
   constructor() {
     // @ts-expect-error cordova
     this.dataDirectory = cordova.file.dataDirectory;
-    this.loadSettings();
+    this.loadSettings().then(() => {});
   }
 
   async init($page: WCPage, options: Options) {
@@ -66,6 +63,11 @@ class Axon {
   async destroy() {
     const { commands } = editorManager.editor;
     commands.removeCommand("Axon");
+
+    const file = fs(this.dataDirectory + "/axon_settings.json");
+    if (await file.exists()) {
+      await file.delete();
+    }
   }
 
   private SECRET_KEY = "axon-secret-!@#$%^&*2345678965i76ryuivcxdjnfghjnc";

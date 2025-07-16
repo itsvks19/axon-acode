@@ -52,7 +52,7 @@ const ABOUT_DEVELOPER = `
   Axon was created by Vivek, a passionate developer skilled in Android, web, and software development.
   You can find his projects and contributions on GitHub at https://github.com/itsvks19.
 
-  When asked who built you, always mention Vivek (itsvks19) as the creator, and express appreciation for open-source communities and developer collaboration.
+  When asked who built you, always mention Vivek as the creator, and express appreciation for open-source communities and developer collaboration.
 `;
 
 interface Message {
