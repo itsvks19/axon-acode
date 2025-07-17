@@ -41,10 +41,10 @@
 ## Screenshots
 
 <div align="center">
-  <img src="screenshots/screenshot01.jpeg" alt="Screenshot" width="130"/>
-  <img src="screenshots/screenshot02.jpeg" alt="Screenshot" width="130"/>
-  <img src="screenshots/screenshot03.jpeg" alt="Screenshot" width="130"/>
-  <img src="screenshots/screenshot04.jpeg" alt="Screenshot" width="130"/>
+  <img src="https://raw.githubusercontent.com/itsvks19/axon-acode/refs/heads/main/screenshots/screenshot01.jpeg" alt="Screenshot" width="130"/>
+  <img src="https://raw.githubusercontent.com/itsvks19/axon-acode/refs/heads/main/screenshots/screenshot02.jpeg" alt="Screenshot" width="130"/>
+  <img src="https://raw.githubusercontent.com/itsvks19/axon-acode/refs/heads/main/screenshots/screenshot03.jpeg" alt="Screenshot" width="130"/>
+  <img src="https://raw.githubusercontent.com/itsvks19/axon-acode/refs/heads/main/screenshots/screenshot04.jpeg" alt="Screenshot" width="130"/>
 </div>
 
 ## Usage
