@@ -7,16 +7,18 @@ import { createRoot } from "react-dom/client";
 import * as React from "react";
 import CryptoJS from "crypto-js";
 
-const fs = acode.require("fs");
+export const fs = acode.require("fs");
 
 export type AxonSettings = {
-  llm: string;
+  llm: Provider;
   apiKey?: string;
 };
 
 export type AxonProps = {
   settings: AxonSettings;
 };
+
+export type Provider = "groq" | "openai" | "anthropic" | "gemini" | "mistral";
 
 class Axon {
   public baseUrl: string;
@@ -162,7 +164,7 @@ if (window.acode) {
         if (key === "language-model") {
           localStorage.setItem("axon-llm", value as string);
 
-          axon.settings.llm = value as string;
+          axon.settings.llm = value as Provider;
           await axon.saveSettings();
           acode.pushNotification("Saved", "Language model saved successfully", {
             type: "success",

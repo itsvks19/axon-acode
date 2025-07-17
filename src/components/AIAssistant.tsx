@@ -1,21 +1,22 @@
-import { useState, useRef, useEffect } from "react";
-import { ChatHeader } from "./ChatHeader";
-import { ChatMessage } from "./ChatMessage";
-import { ChatInput } from "./ChatInput";
-import { EmptyState } from "./EmptyState";
+import { AxonProps, fs, type Provider } from "@/axon";
+import { FileContext, type FileItem } from "@/components/FileContext.tsx";
+import { ModelSelector } from "@/components/ModelSelector.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { getFirstModelOfProvider } from "@/Models";
+import { ChatAnthropic } from "@langchain/anthropic";
+import { AIMessage, HumanMessage, SystemMessage, } from "@langchain/core/messages";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatGroq } from "@langchain/groq";
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatMistralAI } from "@langchain/mistralai";
-import {
-  AIMessage,
-  HumanMessage,
-  SystemMessage,
-} from "@langchain/core/messages";
-import { AxonProps, AxonSettings } from "@/axon";
-import { useToast } from "@/hooks/use-toast";
+import { ChatOpenAI } from "@langchain/openai";
+import { X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChatHeader } from "./ChatHeader";
+import { ChatInput } from "./ChatInput";
+import { ChatMessage } from "./ChatMessage";
+import { EmptyState } from "./EmptyState";
 
 const SYSTEM_PROMPT = `
   You are Axon, an advanced AI pair programmer, built to integrate seamlessly into Acode editor.
@@ -66,12 +67,18 @@ export function AIAssistant({ settings }: AxonProps) {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [selectedModel, setSelectedModel] = useState(getFirstModelOfProvider(settings.llm).id);
+  const [showSettings, setShowSettings] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const getVisibleMessages = (messages: Message[]) =>
+  const filterVisibleMessages = (messages: Message[]) =>
     messages.filter((message) => message.role !== "system");
 
-  const llm = createLLM(settings);
+  const llm = useMemo(() => {
+    console.log("Model: " + selectedModel);
+    return createLLM(settings.llm, selectedModel, settings.apiKey);
+  }, [settings.llm, selectedModel, settings.apiKey]);
 
   useEffect(() => {
     messages.push({
@@ -80,6 +87,31 @@ export function AIAssistant({ settings }: AxonProps) {
       role: "system",
       timestamp: new Date(),
     });
+
+    if (editorManager) {
+      editorManager.files.forEach((file) => {
+        if (file.uri) {
+          fs(file.uri).stat().then((stat) => {
+            // @ts-expect-error stat.type
+            const type = stat.type;
+            // @ts-expect-error stat.length
+            const length = stat.length;
+
+            fs(file.uri).readFile("utf-8").then((content) => {
+              const fileItem: FileItem = {
+                id: Date.now().toString() + Math.random(),
+                name: stat.name,
+                type: type,
+                size: length,
+                content
+              };
+
+              setFiles((prev) => [...prev, fileItem]);
+            });
+          });
+        }
+      });
+    }
   }, []);
 
   // Auto-scroll to bottom
@@ -137,18 +169,20 @@ export function AIAssistant({ settings }: AxonProps) {
         );
 
       let context = content;
-      if (userWantsCodeContext && editorManager.activeFile) {
-        const filename = editorManager.activeFile.filename;
-        const currentCode = editorManager.editor.getValue();
-        if (currentCode.trim()) {
-          context = `
-            Current file: ${filename}
-            Code:
-            ${currentCode}
+      if (userWantsCodeContext && files.length > 0) {
+        context = `
+          file context:
+            ${files.map((file, index) => `
+              index ${index}:
+                name: ${file.name}
+                type: ${file.type}
+                size: ${file.size}
+                content: ${file.content}
+            `).join("\n")}
 
+          user:
             ${content}
-          `;
-        }
+        `;
       }
 
       conversation.push(new HumanMessage(context));
@@ -178,23 +212,24 @@ export function AIAssistant({ settings }: AxonProps) {
   };
 
   return (
-    <div className="flex flex-col h-full max-w-screen mx-auto bg-background border-l border-r border-border shadow-elegant">
-      <ChatHeader />
+    <div
+      className="flex flex-col h-full max-w-screen mx-auto bg-background border-l border-r border-border shadow-elegant">
+      <ChatHeader onSettingsClick={() => setShowSettings(!showSettings)}/>
 
       <div className="flex-1 flex flex-col min-h-0">
-        {messages.length === 0 ? (
+        {filterVisibleMessages(messages).length === 0 ? (
           <ScrollArea className="flex-1">
-            <EmptyState />
+            <EmptyState/>
           </ScrollArea>
         ) : (
           <ScrollArea ref={scrollAreaRef} className="flex-1">
             <div className="p-4 space-y-4">
-              {getVisibleMessages(messages).map((message, index) => (
+              {filterVisibleMessages(messages).map((message, index) => (
                 <ChatMessage
                   key={message.id}
                   message={message}
-                  isLatest={index === getVisibleMessages(messages).length - 1}
-                  handleExplainAgain={() => {
+                  isLatest={index === filterVisibleMessages(messages).length - 1}
+                  handleExplainAgain={async () => {
                     const lastAiMsg = messages.pop();
                     if (lastAiMsg) {
                       setMessages([...messages.filter((m) => m !== lastAiMsg)]);
@@ -207,7 +242,7 @@ export function AIAssistant({ settings }: AxonProps) {
                       ]);
                     }
 
-                    handleSendMessage(lastUserMsg?.content);
+                    await handleSendMessage(lastUserMsg?.content);
                   }}
                   handleInsertCode={() => {
                     const lastAiMsg = [...messages]
@@ -225,16 +260,14 @@ export function AIAssistant({ settings }: AxonProps) {
 
                           toast({
                             title: "Code Inserted",
-                            description:
-                              "The code has been inserted into the editor.",
+                            description: "The code has been inserted into the editor.",
                             duration: 3000,
                           });
                         }
                       } else {
                         toast({
                           title: "No Code Found",
-                          description:
-                            "No code blocks found in the recent AI response.",
+                          description: "No code blocks found in the recent AI response.",
                           duration: 3000,
                         });
                       }
@@ -248,7 +281,8 @@ export function AIAssistant({ settings }: AxonProps) {
                   <div className="max-w-[80%]">
                     <div className="flex items-center mb-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-gradient-ai text-ai-bubble-foreground flex items-center justify-center text-xs font-medium">
+                        <div
+                          className="w-6 h-6 rounded-full bg-gradient-ai text-ai-bubble-foreground flex items-center justify-center text-xs font-medium">
                           A
                         </div>
                         <span className="text-sm font-medium text-muted-foreground">
@@ -257,7 +291,8 @@ export function AIAssistant({ settings }: AxonProps) {
                       </div>
                     </div>
 
-                    <div className="bg-gradient-ai text-ai-bubble-foreground px-4 py-3 rounded-2xl rounded-bl-md shadow-bubble">
+                    <div
+                      className="bg-gradient-ai text-ai-bubble-foreground px-4 py-3 rounded-2xl rounded-bl-md shadow-bubble">
                       <div className="flex items-center gap-2">
                         <div className="flex gap-1">
                           <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
@@ -281,70 +316,100 @@ export function AIAssistant({ settings }: AxonProps) {
         )}
       </div>
 
-      <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+      <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading}/>
+
+      {/* Full Screen Settings Overlay */}
+      {showSettings && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 z-40 animate-fade-in"
+            onClick={() => setShowSettings(false)}
+          />
+
+          {/* Settings Panel */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-scale-in">
+            <div
+              className="bg-background border border-border rounded-lg w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-border">
+                <h2 className="text-xl font-semibold text-foreground">Settings</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSettings(false)}
+                  className="hover:bg-accent/80"
+                >
+                  <X className="h-4 w-4"/>
+                </Button>
+              </div>
+
+              {/* Content */}
+              <div className="p-4 sm:p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+                <ModelSelector
+                  provider={settings.llm}
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                />
+
+                <FileContext
+                  files={files}
+                  onFilesChange={setFiles}
+                />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-function createLLM(settings: AxonSettings) {
+function createLLM(provider: Provider, model: string, apiKey: string) {
   const temperature = 0.7;
-  const apiKey = settings.apiKey || "invalid";
+  const key = apiKey ?? "invalid";
 
-  switch (settings.llm) {
+  switch (provider) {
     case "groq": {
       return new ChatGroq({
-        model: "llama-3.3-70b-versatile",
+        model,
         temperature,
-        apiKey,
+        apiKey: key,
       });
     }
     case "openai": {
       return new ChatOpenAI({
-        model: "gpt-4",
+        model,
         temperature,
-        apiKey,
+        apiKey: key,
       });
     }
     case "anthropic": {
       return new ChatAnthropic({
-        model: "claude-sonnet-4-0",
+        model,
         temperature,
-        apiKey,
+        apiKey: key,
       });
     }
     case "gemini": {
       return new ChatGoogleGenerativeAI({
-        model: "gemini-2.0-flash",
+        model,
         temperature,
-        apiKey,
+        apiKey: key,
       });
     }
-    // case "fireworks": {
-    //   return new ChatFireworks({
-    //     model: "accounts/fireworks/models/llama-v3p1-70b-instruct",
-    //     temperature,
-    //     apiKey,
-    //   });
-    // }
     case "mistral": {
       return new ChatMistralAI({
-        model: "mistral-large-latest",
+        model,
         temperature,
-        apiKey,
+        apiKey: key,
       });
     }
-    // case "vertex": {
-    //   return new ChatVertexAI({
-    //     model: "gemini-1.5-flash",
-    //     temperature,
-    //     apiKey,
-    //   });
-    // }
     default:
       return new ChatGoogleGenerativeAI({
-        model: "gemini-2.0-flash",
+        model,
         temperature,
-        apiKey,
+        apiKey: key,
       });
   }
 }
