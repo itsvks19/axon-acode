@@ -10,7 +10,7 @@ export interface FileItem {
   name: string;
   type: string;
   size: number;
-  content: string;
+  uri: string;
 }
 
 interface FileContextProps {
@@ -30,7 +30,7 @@ const readFilesAsFileItems = (fileList: File[]): Promise<FileItem[]> => {
             name: file.name,
             type: file.type,
             size: file.size,
-            content: reader.result as string,
+            uri: ""
           });
         };
 

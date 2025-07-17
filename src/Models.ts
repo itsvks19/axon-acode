@@ -233,3 +233,7 @@ export const modelMap = new Map<Provider, ModelOption[]>([
 export function getFirstModelOfProvider(provider: Provider): ModelOption {
   return modelMap.get(provider)[0]
 }
+
+export function getFirstAdvancedModel(provider: Provider): ModelOption {
+  return modelMap.get(provider).find(item => item.type === "advanced");
+}

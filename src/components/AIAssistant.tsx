@@ -4,13 +4,22 @@ import { ModelSelector } from "@/components/ModelSelector.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { getFirstModelOfProvider } from "@/Models";
+import { LLMCallbackHandler } from "@/lib/LLMCallbackHandler.ts";
+import { getFirstAdvancedModel } from "@/Models";
+import { getActiveFileUri, setCurrentEditorText } from "@/tools/editor.ts";
+import { getFileName, getOpenedFileUris, readFile, writeFile } from "@/tools/fs.ts";
+import { logTool } from "@/tools/logger.ts";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { AIMessage, HumanMessage, SystemMessage, } from "@langchain/core/messages";
+import {
+  AIMessage,
+  HumanMessage,
+} from "@langchain/core/messages";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatGroq } from "@langchain/groq";
 import { ChatMistralAI } from "@langchain/mistralai";
 import { ChatOpenAI } from "@langchain/openai";
+import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
 import { X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatHeader } from "./ChatHeader";
@@ -19,41 +28,36 @@ import { ChatMessage } from "./ChatMessage";
 import { EmptyState } from "./EmptyState";
 
 const SYSTEM_PROMPT = `
-  You are Axon, an advanced AI pair programmer, built to integrate seamlessly into Acode editor.
+You are Axon, a highly capable AI pair programmer embedded in Acode — a lightweight code editor for Android.
 
-  Your primary goal is to help the user write high-quality code quickly and efficiently.
-  You have access to the current file's contents and the user's questions.
+Your mission is to assist the user in writing, debugging, and improving code efficiently. You can understand the current file contents and interact using specialized tools.
 
-  Your capabilities include:
-  - Writing new functions, classes, or modules.
-  - Refactoring existing code for readability or performance.
-  - Debugging and identifying errors.
-  - Providing concise explanations of code snippets.
-  - Offering best practices and patterns relevant to the language.
+You must think step-by-step and call tools when needed.
 
-  **Rules for responses:**
-  - If providing code, always use a markdown code block with the correct language (like \`\`\`python or \`\`\`javascript).
-  - Only include the minimal necessary code to answer the question. Do not repeat the entire file unless explicitly asked.
-  - If the user asks for an explanation, give a short and clear technical explanation.
-  - If the user says "insert this," only output the code snippet to insert, nothing else.
+Your capabilities include:
+- Understanding code context provided by the user or loaded from files.
+- Detecting bugs or anti-patterns and suggesting clean, idiomatic fixes.
+- Writing functions, classes, or code snippets when requested.
+- Refactoring code for readability, performance, or style.
+- Explaining code clearly and concisely.
+- Using tools to access or modify files when needed.
 
-  You should act like a collaborative developer — keep responses short, precise, and focused on what was asked.
-`;
+Rules:
+- Always prefer minimal, focused code snippets in your response.
+- When including code, use markdown with the correct language (e.g. \`\`\`js), ignore this if writing in a file.
+- Never output unrelated information or speculation.
+- Keep your tone technical, concise, and helpful — like a senior developer.
+- Reload the editor if modifying any file.
+- When needed get file uri(s) using tools.
+- Log every single task you do or you think using log tool.
 
-const ABOUT_ACODE = `
-  When asked about Acode, always explain it as a lightweight code editor app for Android that supports multiple programming languages, syntax highlighting, live preview, file management, and basic Git integration.
-  Highlight that it's useful for web developers, students, and anyone wanting a VS Code–like experience on mobile, though simpler.
+Context:
+- Acode is a mobile-friendly code editor for developers on Android. Keep explanations mobile-friendly and brief.
+- Your creator is Vivek, a passionate open-source developer (https://github.com/itsvks19).
 
-  Your responses should be clear, concise, and technical, avoiding unnecessary fluff.
-  If appropriate, provide quick comparisons to other editors, or tips on workflows (like using Acode with Termux).
-  Always maintain an enthusiastic, helpful tone.
-`;
+When the user provides code or file-related questions, you may chain tool calls intelligently — for example: read a file → analyze → fix bug → format → write back.
 
-const ABOUT_DEVELOPER = `
-  Axon was created by Vivek, a passionate developer skilled in Android, web, and software development.
-  You can find his projects and contributions on GitHub at https://github.com/itsvks19.
-
-  When asked who built you, always mention Vivek as the creator, and express appreciation for open-source communities and developer collaboration.
+Respond clearly, accurately, and use tools if needed to complete your task.
 `;
 
 interface Message {
@@ -67,8 +71,9 @@ export function AIAssistant({ settings }: AxonProps) {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [agentStatus, setAgentStatus] = useState("Thinking...");
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [selectedModel, setSelectedModel] = useState(getFirstModelOfProvider(settings.llm).id);
+  const [selectedModel, setSelectedModel] = useState(getFirstAdvancedModel(settings.llm).id);
   const [showSettings, setShowSettings] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -80,14 +85,19 @@ export function AIAssistant({ settings }: AxonProps) {
     return createLLM(settings.llm, selectedModel, settings.apiKey);
   }, [settings.llm, selectedModel, settings.apiKey]);
 
-  useEffect(() => {
-    messages.push({
-      id: Date.now().toString(),
-      content: SYSTEM_PROMPT + "\n\n" + ABOUT_ACODE + "\n\n" + ABOUT_DEVELOPER,
-      role: "system",
-      timestamp: new Date(),
-    });
+  const prompt = ChatPromptTemplate.fromMessages([
+    ["system", SYSTEM_PROMPT],
+    ["placeholder", "{chat_history}"],
+    ["human", "{input}"],
+    ["placeholder", "{agent_scratchpad}"],
+  ]);
 
+  const tools = [
+    readFile, writeFile, getFileName, getOpenedFileUris,
+    setCurrentEditorText, getActiveFileUri, logTool
+  ];
+
+  useEffect(() => {
     if (editorManager) {
       editorManager.files.forEach((file) => {
         if (file.uri) {
@@ -103,7 +113,7 @@ export function AIAssistant({ settings }: AxonProps) {
                 name: stat.name,
                 type: type,
                 size: length,
-                content
+                uri: file.uri,
               };
 
               setFiles((prev) => [...prev, fileItem]);
@@ -150,48 +160,32 @@ export function AIAssistant({ settings }: AxonProps) {
         return;
       }
 
-      const conversation = [...messages].map((msg) => {
-        switch (msg.role) {
-          case "system":
-            return new SystemMessage(msg.content);
-          case "user":
-            return new HumanMessage(msg.content);
-          case "assistant":
-            return new AIMessage(msg.content);
-          default:
-            return new HumanMessage(msg.content);
-        }
+      const messagesForAgent = [
+        //new SystemMessage(SYSTEM_PROMPT),
+        ...messages.map((msg) =>
+          msg.role === "user"
+            ? new HumanMessage(msg.content)
+            : new AIMessage(msg.content)
+        )
+      ];
+
+      const agent = createToolCallingAgent({ llm, tools, prompt });
+      const agentExecutor = new AgentExecutor({
+        agent, tools,
+        callbacks: [new LLMCallbackHandler(setAgentStatus)],
+        returnIntermediateSteps: true
       });
 
-      const userWantsCodeContext =
-        /\b(code|file|function|bug|refactor|fix|optimize|explain|write|editor)\b/i.test(
-          content,
-        );
+      const response = await agentExecutor.invoke({
+        input: content,
+        chat_history: messagesForAgent,
+      });
 
-      let context = content;
-      if (userWantsCodeContext && files.length > 0) {
-        context = `
-          file context:
-            ${files.map((file, index) => `
-              index ${index}:
-                name: ${file.name}
-                type: ${file.type}
-                size: ${file.size}
-                content: ${file.content}
-            `).join("\n")}
-
-          user:
-            ${content}
-        `;
-      }
-
-      conversation.push(new HumanMessage(context));
-
-      const response = await llm.invoke(conversation);
+      console.log(response);
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: response.content.toString(),
+        content: response.output,
         role: "assistant",
         timestamp: new Date(),
       };
@@ -305,7 +299,7 @@ export function AIAssistant({ settings }: AxonProps) {
                             style={{ animationDelay: "0.2s" }}
                           ></div>
                         </div>
-                        <span className="text-sm opacity-70">Thinking...</span>
+                        <span className="text-sm opacity-70">{agentStatus}</span>
                       </div>
                     </div>
                   </div>

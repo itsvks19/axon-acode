@@ -1,7 +1,7 @@
 # Axon - AI Coding Assistant for Acode
 
 <div align="center">
-  <img src="banner.png" alt="Axon Banner" height="190"/>
+  <img src="https://raw.githubusercontent.com/itsvks19/axon-acode/refs/heads/main/banner.png" alt="Axon Banner" height="190"/>
   
   **Smart AI pair programmer that integrates seamlessly into Acode editor**
 </div>
@@ -17,6 +17,9 @@
 - **Direct Code Insertion**: Insert AI-generated code directly into your editor
 - **Secure API Key Storage**: Encrypted storage of your API keys
 - **Modern UI**: Clean, responsive chat interface with syntax highlighting
+
+> [!WARNING]
+> In the latest version, Axon might not work properly. If you encounter any error then try changing the **"AI Model"** in the settings.
 
 ## Setup
 
@@ -34,6 +37,15 @@
 3. Search "**Axon**" in command palette to open the AI
 
 4. **Start coding** with AI assistance!
+
+## Screenshots
+
+<div align="center">
+  <img src="screenshots/screenshot01.jpeg" alt="Screenshot" width="130"/>
+  <img src="screenshots/screenshot02.jpeg" alt="Screenshot" width="130"/>
+  <img src="screenshots/screenshot03.jpeg" alt="Screenshot" width="130"/>
+  <img src="screenshots/screenshot04.jpeg" alt="Screenshot" width="130"/>
+</div>
 
 ## Usage
 
