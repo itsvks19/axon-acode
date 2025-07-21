@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Copy, RotateCcw, Code, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { isAcode } from "@/lib/utils";
 
 interface ChatMessageProps {
   message: {
@@ -15,7 +16,12 @@ interface ChatMessageProps {
   handleInsertCode: () => void;
 }
 
-export function ChatMessage({ message, isLatest = false, handleExplainAgain, handleInsertCode }: ChatMessageProps) {
+export function ChatMessage({
+  message,
+  isLatest = false,
+  handleExplainAgain,
+  handleInsertCode,
+}: ChatMessageProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
@@ -106,15 +112,17 @@ export function ChatMessage({ message, isLatest = false, handleExplainAgain, han
               {copied ? "Copied!" : "Copy"}
             </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleInsertCode}
-              className="h-7 px-2 text-xs hover:bg-accent/80 hover:text-accent-foreground transition-colors"
-            >
-              <Code className="w-3 h-3 mr-1" />
-              Insert Code
-            </Button>
+            {isAcode() && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleInsertCode}
+                className="h-7 px-2 text-xs hover:bg-accent/80 hover:text-accent-foreground transition-colors"
+              >
+                <Code className="w-3 h-3 mr-1" />
+                Insert Code
+              </Button>
+            )}
 
             <Button
               variant="ghost"
