@@ -6,8 +6,13 @@ import "./axon.css";
 import { createRoot } from "react-dom/client";
 import * as React from "react";
 import CryptoJS from "crypto-js";
+import { isAcode } from "./lib/utils";
 
-export const fs = acode.require("fs");
+export const acodeFs = () => {
+  if (isAcode()) {
+    return acode.require("fs");
+  }
+}
 
 export type AxonSettings = {
   llm: Provider;

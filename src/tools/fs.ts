@@ -1,4 +1,4 @@
-import { fs } from "@/axon.tsx";
+import { acodeFs } from "@/axon.tsx";
 import { DynamicStructuredTool, DynamicTool } from "@langchain/core/tools";
 import { z } from "zod";
 
@@ -9,6 +9,7 @@ const readFile = new DynamicStructuredTool({
     uri: z.string().describe("Valid uri of the file"),
   }),
   func: async ({ uri }) => {
+    const fs = acodeFs();
     try {
       return await fs(uri).readFile("utf-8");
     } catch (e) {
@@ -25,6 +26,7 @@ const writeFile = new DynamicStructuredTool({
     content: z.string().describe("File contents to write"),
   }),
   func: async ({ uri, content }) => {
+    const fs = acodeFs();
     try {
       return await fs(uri).writeFile(content);
     } catch (e) {
@@ -40,6 +42,7 @@ const getFileName = new DynamicStructuredTool({
     uri: z.string().describe("Valid uri of the file")
   }),
   func: async ({ uri }) => {
+    const fs = acodeFs();
     try {
       const stat = await fs(uri).stat();
       return stat.name;
