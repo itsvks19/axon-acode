@@ -6,6 +6,8 @@
   **Smart AI pair programmer that integrates seamlessly into Acode editor**
 </div>
 
+Also available on Web: [https://axonnn.netlify.app](https://axonnn.netlify.app)
+
 ## Features
 
 - **Multi-Provider AI Support**: Choose from OpenAI, Anthropic, Google Gemini, Groq, and Mistral AI
