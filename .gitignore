@@ -26,3 +26,5 @@ pnpm-lock.yaml
 *.sln
 *.sw?
 .env
+# Local Netlify folder
+.netlify

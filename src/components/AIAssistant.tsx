@@ -16,7 +16,10 @@ import {
 import { logTool } from "@/tools/logger.ts";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
-import { ChatPromptTemplate } from "@langchain/core/prompts";
+import {
+  BaseMessagePromptTemplateLike,
+  ChatPromptTemplate,
+} from "@langchain/core/prompts";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatGroq } from "@langchain/groq";
 import { ChatMistralAI } from "@langchain/mistralai";
@@ -30,6 +33,7 @@ import { ChatMessage } from "./ChatMessage";
 import { EmptyState } from "./EmptyState";
 import { isAcode } from "@/lib/utils";
 import system from "@/lib/system";
+import { InputValues } from "@langchain/core/utils/types";
 
 interface Message {
   id: string;
@@ -53,10 +57,6 @@ export function AIAssistant({ settings }: AxonProps) {
     }
   }, [settings?.llm]);
 
-  const apiKey = useMemo(() => {
-    return settings?.apiKey || import.meta.env.VITE_GEMINI_API_KEY;
-  }, [settings?.apiKey]);
-
   const [selectedModel, setSelectedModel] = useState(
     getFirstAdvancedModel(provider).id,
   );
@@ -68,15 +68,18 @@ export function AIAssistant({ settings }: AxonProps) {
 
   const llm = useMemo(() => {
     console.log("Model: " + selectedModel);
-    return createLLM(provider, selectedModel, apiKey);
-  }, [provider, selectedModel, apiKey]);
+    return createLLM(provider, selectedModel, settings?.apiKey);
+  }, [provider, selectedModel, settings?.apiKey]);
 
-  const prompt = ChatPromptTemplate.fromMessages([
+  const promptMessages: (
+    | ChatPromptTemplate<InputValues, string>
+    | BaseMessagePromptTemplateLike
+  )[] = [
     ["system", system()],
     ["placeholder", "{chat_history}"],
     ["human", "{input}"],
     ["placeholder", "{agent_scratchpad}"],
-  ]);
+  ];
 
   const tools = useMemo(() => {
     if (!settings) return [];
@@ -147,62 +150,101 @@ export function AIAssistant({ settings }: AxonProps) {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
+    const messagesForAgent = [
+      //new SystemMessage(SYSTEM_PROMPT),
+      ...messages.map((msg) =>
+        msg.role === "user"
+          ? new HumanMessage(msg.content)
+          : new AIMessage(msg.content),
+      ),
+    ];
+
     try {
-      if (!apiKey) {
-        const errorMsg: Message = {
-          id: Date.now().toString(),
-          content:
-            "API key not found. Please set your API key in the plugin settings.",
+      if (isAcode()) {
+        if (!settings?.apiKey) {
+          const errorMsg: Message = {
+            id: Date.now().toString(),
+            content:
+              "API key not found. Please set your API key in the plugin settings.",
+            role: "assistant",
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+          return;
+        }
+
+        const prompt = ChatPromptTemplate.fromMessages(promptMessages);
+        const agent = createToolCallingAgent({ llm, tools, prompt });
+        const agentExecutor = new AgentExecutor({
+          agent,
+          tools,
+          callbacks: [new LLMCallbackHandler(setAgentStatus)],
+          returnIntermediateSteps: true,
+        });
+
+        const response = await agentExecutor.invoke({
+          input: content,
+          chat_history: messagesForAgent,
+        });
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: response.output,
           role: "assistant",
           timestamp: new Date(),
         };
-        setMessages((prev) => [...prev, errorMsg]);
-        return;
+
+        setMessages((prev) => [...prev, aiMessage]);
+      } else {
+        setAgentStatus("Connecting to AI service...");
+        setAgentStatus("Thinking...");
+
+        const response = await fetch("/.netlify/functions/gemini", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: promptMessages,
+            chat_history: messagesForAgent,
+            message: content,
+            modelName: selectedModel,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          console.error(data.error);
+          throw new Error(`HTTP error! status: ${response.status}\n\n${data.error}`);
+        }
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: data.response.output,
+          role: "assistant",
+          timestamp: new Date(),
+        };
+
+        setMessages((prev) => [...prev, aiMessage]);
       }
-
-      const messagesForAgent = [
-        //new SystemMessage(SYSTEM_PROMPT),
-        ...messages.map((msg) =>
-          msg.role === "user"
-            ? new HumanMessage(msg.content)
-            : new AIMessage(msg.content),
-        ),
-      ];
-
-      const agent = createToolCallingAgent({ llm, tools, prompt });
-      const agentExecutor = new AgentExecutor({
-        agent,
-        tools,
-        callbacks: [new LLMCallbackHandler(setAgentStatus)],
-        returnIntermediateSteps: true,
-      });
-
-      const response = await agentExecutor.invoke({
-        input: content,
-        chat_history: messagesForAgent,
-      });
-
-      console.log(response);
-
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: response.output,
-        role: "assistant",
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, aiMessage]);
     } catch (err) {
       console.error("AI Error:", err);
       const errorMsg: Message = {
         id: (Date.now() + 2).toString(),
-        content: err.message,
+        content:
+          err.message || "An error occurred while processing your request.",
         role: "assistant",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
+      setAgentStatus("Thinking...");
     }
   };
 
